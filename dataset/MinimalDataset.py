@@ -18,7 +18,6 @@ class MinimalDataset(Dataset):
         img = Image.open(path_img).convert("RGB")
         if self.transform is not None:
             img = self.transform(img)
-        print(img.detach().numpy())
         return img, label
 
     def __len__(self):
