@@ -12,11 +12,11 @@ class CelebADataset(Dataset):
         self.transform = transform
 
     def __getitem__(self, item) -> Tuple[numpy.ndarray, int]:
-        path_img = self.images[item]
-        img = Image.open(path_img).convert("RGB").crop((8, 28, 168, 188))
+        path_img, label = self.images[item]
+        img = Image.open(path_img).crop((8, 28, 168, 188)).convert("RGB")
         if self.transform is not None:
             img = self.transform(img)
-        return img
+        return img, label
 
     def __len__(self):
         return len(self.images)
@@ -31,6 +31,6 @@ class CelebADataset(Dataset):
 
         for im in imgs_train:
             path_img = os.path.join(path, im)
-            images.append(path_img)
+            images.append((path_img, 0))
 
         return images
