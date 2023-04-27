@@ -22,6 +22,14 @@ hidden_dims224 = [
     256     # 7x7
 ]
 
+hidden_dims160 = [
+    32,     # 80x80
+    128,    # 40x40
+    256,    # 20x20
+    256,    # 10x10
+    256     # 5x5
+]
+
 hidden_dims32 = [
     32,     # 16x16
     128,    # 8x8
@@ -33,7 +41,8 @@ hidden_dims28 = [
     64,    # 7x7
 ]
 
-model = BetaVAE(input_channels=3, latent_dim=256, latent_size=7, hidden_dims=hidden_dims224)
+#model = BetaVAE(input_channels=3, latent_dim=256, latent_size=7, hidden_dims=hidden_dims224)
+model = BetaVAE(input_channels=3, latent_dim=256, latent_size=5, hidden_dims=hidden_dims160)
 #model = BetaVAE(input_channels=1, latent_dim=80, latent_size=7, hidden_dims=hidden_dims28)
 
 #model.train(dataIter, Adam(model.parameters(), lr=1e-3), 16)
@@ -46,18 +55,21 @@ for i in range(3):
     for j in range(3):
         z_mean = torch.rand(256, device="cuda")
         rand_z = torch.randn(256, device="cuda") + z_mean
-        gen_x = model.decode(rand_z).cpu().view(3, 224, 224)
+        gen_x = model.decode(rand_z).cpu().view(3, 160, 160)
         img = transforms.ToPILImage()(gen_x)
         axes[i][j].imshow(img)
 
 plt.show()
 
-z_mean, logvar = model.encode(dataIter.dataset[0][0].view(1, 3, 224, 224).to(model.device))
+_, axes = plt.subplots(2)
+img = transforms.ToPILImage()(dataIter.dataset[0][0])
+axes[0].imshow(img)
+z_mean, logvar = model.encode(dataIter.dataset[0][0].view(1, 3, 160, 160).to(model.device))
 z = reparameterize(z_mean, logvar)
-gen_x = model.decode(z).cpu().view(3, 224, 224)
+gen_x = model.decode(z).cpu().view(3, 160, 160)
 img = transforms.ToPILImage()(gen_x)
 print(gen_x.detach().numpy())
-plt.imshow(img)
+axes[1].imshow(img)
 plt.show()
 
 #torch.save(model, "vae.pkl")
