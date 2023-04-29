@@ -59,7 +59,7 @@ class BetaVAE(BaseVAE):
                  gamma: float = 1000.,
                  max_capacity: int = 25,
                  capacity_max_iter: int = 1e5,
-                 loss_type: str = 'B',
+                 loss_type: str = 'H',
                  device: torch.device = "cuda") -> None:
         super(BetaVAE, self).__init__()
 
@@ -86,7 +86,7 @@ class BetaVAE(BaseVAE):
                 nn.Sequential(
                     nn.Conv2d(in_channels, out_channels=h_dim,
                               kernel_size=3, stride=2, padding=1, device=device),
-                    nn.BatchNorm2d(h_dim, device=device),
+                    #nn.BatchNorm2d(h_dim, device=device),
                     nn.LeakyReLU())
             )
             in_channels = h_dim
@@ -112,7 +112,7 @@ class BetaVAE(BaseVAE):
                                        padding=1,
                                        output_padding=1,
                                        device=device),
-                    nn.BatchNorm2d(hidden_dims[i + 1], device=device),
+                    #nn.BatchNorm2d(hidden_dims[i + 1], device=device),
                     nn.LeakyReLU()
                 )
             )
@@ -127,7 +127,7 @@ class BetaVAE(BaseVAE):
                                padding=1,
                                output_padding=1,
                                device=device),
-            nn.BatchNorm2d(hidden_dims[-1], device=device),
+            #nn.BatchNorm2d(hidden_dims[-1], device=device),
             nn.LeakyReLU(),
             nn.Conv2d(hidden_dims[-1], out_channels=input_channels, kernel_size=3, padding=1, device=device),
             nn.Sigmoid()
@@ -161,9 +161,9 @@ class BetaVAE(BaseVAE):
         mu = args[2]
         log_var = args[3]
 
-        recons_loss = nn.MSELoss(size_average=False)(recons, x0)
+        recons_loss = nn.MSELoss(reduction='sum')(recons, x0)
 
-        kld_loss = -0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp())
+        kld_loss = torch.mean(-0.5 * torch.sum(1 + log_var - mu ** 2 - log_var.exp(), dim=1), dim=0)
 
         if self.loss_type == 'H':
             loss = recons_loss + self.beta * kld_loss

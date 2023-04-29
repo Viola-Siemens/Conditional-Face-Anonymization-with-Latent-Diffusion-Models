@@ -7,12 +7,14 @@ import matplotlib.pyplot as plt
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
+from dataset.CelebADataset import CelebADataset
 from dataset.MinimalDataset import MinimalDataset
 from model.vae.VAE import BetaVAE, reparameterize
 
-dataset = MinimalDataset("C:\\数据集\\城市与乡村的识别", transform=transforms.ToTensor())
+#dataset = MinimalDataset("C:\\数据集\\城市与乡村的识别", transform=transforms.ToTensor())
+dataset = CelebADataset("C:\\Users\\11241\\Downloads\\ciagan-master\\dataset\\celeba\\clr\\0", transform=transforms.ToTensor())
 #dataset = MNIST('./data', train=True, transform=transforms.ToTensor(), download=True)
-dataIter = DataLoader(dataset, batch_size=20, shuffle=True)
+dataIter = DataLoader(dataset, batch_size=16, shuffle=True)
 
 hidden_dims224 = [
     32,     # 112x112
@@ -41,11 +43,13 @@ hidden_dims28 = [
     64,    # 7x7
 ]
 
-#model = BetaVAE(input_channels=3, latent_dim=256, latent_size=7, hidden_dims=hidden_dims224)
-model = BetaVAE(input_channels=3, latent_dim=256, latent_size=5, hidden_dims=hidden_dims160)
-#model = BetaVAE(input_channels=1, latent_dim=80, latent_size=7, hidden_dims=hidden_dims28)
+latent_dim = 256
 
-#model.train(dataIter, Adam(model.parameters(), lr=1e-3), 16)
+#model = BetaVAE(input_channels=3, latent_dim=latent_dim, latent_size=7, hidden_dims=hidden_dims224)
+model = BetaVAE(input_channels=3, latent_dim=latent_dim, latent_size=5, hidden_dims=hidden_dims160)
+#model = BetaVAE(input_channels=1, latent_dim=latent_dim, latent_size=7, hidden_dims=hidden_dims28)
+
+#model.train(dataIter, Adam(model.parameters(), lr=1e-3), 20)
 
 model = torch.load("vae.pkl")
 
@@ -53,8 +57,8 @@ model = torch.load("vae.pkl")
 _, axes = plt.subplots(3, 3)
 for i in range(3):
     for j in range(3):
-        z_mean = torch.rand(256, device="cuda")
-        rand_z = torch.randn(256, device="cuda") + z_mean
+        z_mean = torch.rand(latent_dim, device="cuda")
+        rand_z = torch.randn(latent_dim, device="cuda") + z_mean
         gen_x = model.decode(rand_z).cpu().view(3, 160, 160)
         img = transforms.ToPILImage()(gen_x)
         axes[i][j].imshow(img)
@@ -64,11 +68,8 @@ plt.show()
 _, axes = plt.subplots(2)
 img = transforms.ToPILImage()(dataIter.dataset[0][0])
 axes[0].imshow(img)
-z_mean, logvar = model.encode(dataIter.dataset[0][0].view(1, 3, 160, 160).to(model.device))
-z = reparameterize(z_mean, logvar)
-gen_x = model.decode(z).cpu().view(3, 160, 160)
+gen_x = model.cpu().generate(dataIter.dataset[0][0].view(1, 3, 160, 160).to(model.device)).cpu().view(3, 160, 160)
 img = transforms.ToPILImage()(gen_x)
-print(gen_x.detach().numpy())
 axes[1].imshow(img)
 plt.show()
 

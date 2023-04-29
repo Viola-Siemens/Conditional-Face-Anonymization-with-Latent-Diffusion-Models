@@ -25,6 +25,7 @@ class CelebADataset(Dataset):
         images = []
 
         imgs_train = list(filter(
+            #lambda x: x.endswith(".jpg"),
             lambda x: x.endswith(".png"),
             os.listdir(path)
         ))
