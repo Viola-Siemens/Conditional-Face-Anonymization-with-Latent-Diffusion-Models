@@ -1,7 +1,7 @@
 import os
 from typing import List, Tuple
 
-import numpy
+import numpy as npy
 from PIL import Image
 from torch.utils.data import Dataset
 
@@ -12,9 +12,9 @@ class MinimalDataset(Dataset):
         self.images = self.get_images(path)
         self.transform = transform
 
-    def __getitem__(self, item) -> Tuple[numpy.ndarray, int]:
+    def __getitem__(self, item) -> Tuple[npy.ndarray, int]:
         path_img, label = self.images[item]
-        img = Image.open(path_img).convert("RGB")
+        img = npy.array(Image.open(path_img).convert("RGB")).astype(npy.float64) * (2.0 / 255.0) - 1
         if self.transform is not None:
             img = self.transform(img)
         return img, label
