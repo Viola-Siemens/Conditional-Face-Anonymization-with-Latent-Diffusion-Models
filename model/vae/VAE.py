@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Any, Tuple
+from typing import List, Any, Tuple, Callable
 
 import torch
 from torch import nn, Tensor
@@ -39,7 +39,7 @@ class BaseVAE(nn.Module, ABC):
         pass
 
     @abstractmethod
-    def train(self, dataIter: DataLoader, optimizer: Optimizer, epoches: int) -> None:
+    def train(self, dataIter: DataLoader, optimizer: Optimizer, epoches: int, callback: Callable[[int, float], None]) -> None:
         pass
 
 
@@ -189,7 +189,7 @@ class BetaVAE(BaseVAE):
     def generate(self, x: Tensor, **kwargs) -> Tensor:
         return self.forward(x)[0]
 
-    def train(self, dataIter: DataLoader, optimizer: Optimizer, epoches: int) -> None:
+    def train(self, dataIter: DataLoader, optimizer: Optimizer, epoches: int, callback: Callable[[int, float], None]) -> None:
         for epoch in range(epoches):
             train_loss = 0.0
             for data, label in dataIter:
@@ -202,4 +202,4 @@ class BetaVAE(BaseVAE):
                 optimizer.step()
                 train_loss += loss.cpu().item()
             train_loss /= len(dataIter.dataset)
-            print("Epoch = %d, loss = %f" % (epoch, train_loss))
+            callback(epoch, train_loss)

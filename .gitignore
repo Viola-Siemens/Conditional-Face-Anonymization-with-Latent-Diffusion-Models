@@ -1,3 +1,4 @@
 test/data
 .idea
 test/*.pkl
+test/*.log

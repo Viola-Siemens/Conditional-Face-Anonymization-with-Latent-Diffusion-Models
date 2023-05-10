@@ -1,10 +1,9 @@
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable
 
 import torch
+import torch.nn.functional as F
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
-import torch.nn.functional as F
-import numpy as npy
 
 from model.unet.UNet import UNet
 from model.utils import gather
@@ -72,7 +71,7 @@ class Diffusion:
 
         return self.unet.loss_function(eps_theta, noise)
 
-    def train(self, dataIter: DataLoader, optimizer: Optimizer, epoches: int):
+    def train(self, dataIter: DataLoader, optimizer: Optimizer, epoches: int, callback: Callable[[int, float], None]) -> None:
         for epoch in range(epoches):
             train_loss = 0.0
             for data, label in dataIter:
@@ -84,5 +83,5 @@ class Diffusion:
                 optimizer.step()
                 train_loss += loss.cpu().item()
             train_loss /= len(dataIter.dataset)
-            print("Epoch = %d, loss = %f" % (epoch, train_loss))
+            callback(epoch, train_loss)
 

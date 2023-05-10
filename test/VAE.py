@@ -37,7 +37,14 @@ latent_dim = 512
 #model = BetaVAE(input_channels=3, latent_dim=latent_dim, latent_size=7, hidden_dims=hidden_dims224)
 model = BetaVAE(input_channels=3, latent_dim=latent_dim, latent_size=5, hidden_dims=hidden_dims160)
 
-#model.train(dataIter, Adam(model.parameters(), lr=1e-3), 20)
+'''
+model.train(
+    dataIter,
+    Adam(model.parameters(), lr=1e-3, weight_decay=5e-4),
+    20,
+    lambda epoch, train_loss: print("Epoch = %d, loss = %f" % (epoch, train_loss))
+)
+'''
 
 model = torch.load("vae.pkl")
 

@@ -40,7 +40,12 @@ unet = UNet(input_channels=3, step_dim=n_steps, hidden_step_dim=32, latent_dim=l
 #unet = torch.load("unet.pkl")
 model = Diffusion(eps_model=unet, n_steps=n_steps, beta_0=0.0008, beta_n=0.0128)
 
-model.train(dataIter, Adam(unet.parameters(), lr=1e-3), 10)
+model.train(
+    dataIter,
+    Adam(unet.parameters(), lr=1e-3, weight_decay=5e-4),
+    10,
+    lambda epoch, train_loss: print("Epoch = %d, loss = %f" % (epoch, train_loss))
+)
 
 _, axes = plt.subplots(3, 3)
 for i in range(3):
