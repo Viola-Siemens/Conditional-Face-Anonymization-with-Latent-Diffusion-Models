@@ -34,6 +34,7 @@ hidden_dims160 = [
 
 latent_dim = 512
 
+'''
 model = BetaVAE(input_channels=3, latent_dim=latent_dim, latent_size=5, hidden_dims=hidden_dims160)
 
 model.train(
@@ -42,8 +43,9 @@ model.train(
     256,
     lambda epoch, train_loss: logger.log("Epoch = %d, loss = %f" % (epoch, train_loss))
 )
+'''
 
-# model = torch.load("vae.pkl")
+model = torch.load("vae.pkl")
 
 # Sample
 _, axes = plt.subplots(3, 3)

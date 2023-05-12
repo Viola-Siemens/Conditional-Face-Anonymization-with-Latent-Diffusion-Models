@@ -36,17 +36,22 @@ hidden_dims160 = [
 latent_dim = 160
 n_steps = 32
 
+'''
 unet = UNet(input_channels=3, step_dim=n_steps, hidden_step_dim=32, latent_dim=latent_dim, latent_size=10,
             hidden_dims=hidden_dims160)
-# unet = torch.load("unet.pkl")
+'''
+
+unet = torch.load("unet.pkl")
 model = Diffusion(eps_model=unet, n_steps=n_steps, beta_0=0.0008, beta_n=0.0128)
 
+'''
 model.train(
     dataIter,
     Adam(unet.parameters(), lr=1e-3, weight_decay=5e-4),
     10,
     lambda epoch, train_loss: logger.log("Epoch = %d, loss = %f" % (epoch, train_loss))
 )
+'''
 
 _, axes = plt.subplots(3, 3)
 for i in range(3):
@@ -70,5 +75,5 @@ for i in range(4):
         axes[i][j].imshow(transforms.ToPILImage()((gens[step].view(3, 160, 160) + 1.0) / 2.0))
 plt.show()
 
-torch.save(unet, "unet.pkl")
-torch.save(unet.state_dict(), "unet_parameter.pkl")
+# torch.save(unet, "unet.pkl")
+# torch.save(unet.state_dict(), "unet_parameter.pkl")
