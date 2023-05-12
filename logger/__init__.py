@@ -21,3 +21,6 @@ class Logger:
 
     def warn(self, message: str):
         self.logger.warning(message)
+
+
+logger = Logger("debug")

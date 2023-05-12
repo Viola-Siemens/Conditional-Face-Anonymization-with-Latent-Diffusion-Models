@@ -7,44 +7,45 @@ from torchvision import transforms
 
 import matplotlib.pyplot as plt
 
-from dataset.MinimalDataset import MinimalDataset
 from dataset.CelebADataset import CelebADataset
+from logger import logger
 from model.diffusion.diffusion import Diffusion
 from model.unet.UNet import UNet
 
-import os
-
-#dataset = MinimalDataset("C:\\数据集\\城市与乡村的识别", transform=transforms.ToTensor())
-dataset = CelebADataset("C:\\Users\\11241\\Downloads\\ciagan-master\\dataset\\celeba\\clr\\0", transform=transforms.ToTensor())
+dataset = CelebADataset("C:\\Users\\11241\\Downloads\\ciagan-master\\dataset\\celeba\\clr\\0",
+                        transform=transforms.ToTensor())
 dataIter = DataLoader(dataset, batch_size=8, shuffle=True)
 
+logger.log("Dataset Length: %d" % (len(dataset)))
+
 hidden_dims224 = [
-    32,     # 112x112
-    128,    # 56x56
-    256,    # 28x28
-    400,    # 14x14
-    512     # 7x7
+    32,  # 112x112
+    128,  # 56x56
+    256,  # 28x28
+    400,  # 14x14
+    512  # 7x7
 ]
 
 hidden_dims160 = [
-    16,     # 80x80
-    64,     # 40x40
-    128,    # 20x20
-    160,    # 10x10
+    16,  # 80x80
+    64,  # 40x40
+    128,  # 20x20
+    160,  # 10x10
 ]
 
 latent_dim = 160
 n_steps = 32
 
-unet = UNet(input_channels=3, step_dim=n_steps, hidden_step_dim=32, latent_dim=latent_dim, latent_size=10, hidden_dims=hidden_dims160)
-#unet = torch.load("unet.pkl")
+unet = UNet(input_channels=3, step_dim=n_steps, hidden_step_dim=32, latent_dim=latent_dim, latent_size=10,
+            hidden_dims=hidden_dims160)
+# unet = torch.load("unet.pkl")
 model = Diffusion(eps_model=unet, n_steps=n_steps, beta_0=0.0008, beta_n=0.0128)
 
 model.train(
     dataIter,
     Adam(unet.parameters(), lr=1e-3, weight_decay=5e-4),
     10,
-    lambda epoch, train_loss: print("Epoch = %d, loss = %f" % (epoch, train_loss))
+    lambda epoch, train_loss: logger.log("Epoch = %d, loss = %f" % (epoch, train_loss))
 )
 
 _, axes = plt.subplots(3, 3)

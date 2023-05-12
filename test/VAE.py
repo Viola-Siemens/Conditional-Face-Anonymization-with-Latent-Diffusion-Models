@@ -1,20 +1,20 @@
 import random
 
-import numpy as np
+import matplotlib.pyplot as plt
 import torch
 from torch.optim import Adam
 from torch.utils.data import DataLoader
-
-import matplotlib.pyplot as plt
 from torchvision import transforms
 
 from dataset.CelebADataset import CelebADataset
-from dataset.MinimalDataset import MinimalDataset
-from model.vae.VAE import BetaVAE, reparameterize
+from logger import logger
+from model.vae.VAE import BetaVAE
 
-#dataset = MinimalDataset("C:\\数据集\\城市与乡村的识别", transform=transforms.ToTensor())
-dataset = CelebADataset("C:\\Users\\11241\\Downloads\\ciagan-master\\dataset\\celeba\\clr\\0", transform=transforms.ToTensor())
+dataset = CelebADataset("C:\\Users\\11241\\Downloads\\ciagan-master\\dataset\\celeba\\clr\\0",
+                        transform=transforms.ToTensor())
 dataIter = DataLoader(dataset, batch_size=256, shuffle=True)
+
+logger.log("Dataset Length: %d" % (len(dataset)))
 
 hidden_dims224 = [
     32,     # 112x112
@@ -28,25 +28,22 @@ hidden_dims160 = [
     32,     # 80x80
     128,    # 40x40
     256,    # 20x20
-    512,    # 10x10
-    512     # 5x5
+    400,    # 10x10
+    400     # 5x5
 ]
 
 latent_dim = 512
 
-#model = BetaVAE(input_channels=3, latent_dim=latent_dim, latent_size=7, hidden_dims=hidden_dims224)
 model = BetaVAE(input_channels=3, latent_dim=latent_dim, latent_size=5, hidden_dims=hidden_dims160)
 
-'''
 model.train(
     dataIter,
     Adam(model.parameters(), lr=1e-3, weight_decay=5e-4),
-    20,
-    lambda epoch, train_loss: print("Epoch = %d, loss = %f" % (epoch, train_loss))
+    256,
+    lambda epoch, train_loss: logger.log("Epoch = %d, loss = %f" % (epoch, train_loss))
 )
-'''
 
-model = torch.load("vae.pkl")
+# model = torch.load("vae.pkl")
 
 # Sample
 _, axes = plt.subplots(3, 3)
@@ -69,5 +66,5 @@ img = transforms.ToPILImage()((gen_x + 1.0) / 2.0)
 axes[1].imshow(img)
 plt.show()
 
-#torch.save(model, "vae.pkl")
-#torch.save(model.state_dict(), "vae_parameter.pkl")
+# torch.save(model, "vae.pkl")
+# torch.save(model.state_dict(), "vae_parameter.pkl")
