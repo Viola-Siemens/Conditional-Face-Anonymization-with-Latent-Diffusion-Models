@@ -2,27 +2,19 @@ import random
 
 import matplotlib.pyplot as plt
 import torch
-from torch.optim import Adam
+from torch.optim import RMSprop
 from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from dataset.CelebADataset import CelebADataset
 from logger import logger
-from model.vae.VAE import BetaVAE
+from model.vae.VAE import AdversarialVAE, BetaVAE
 
 dataset = CelebADataset("C:\\Users\\11241\\Downloads\\加强数据集",
                         transform=transforms.ToTensor())
 dataIter = DataLoader(dataset, batch_size=256, shuffle=True)
 
 logger.log("Dataset Length: %d" % (len(dataset)))
-
-hidden_dims224 = [
-    32,     # 112x112
-    128,    # 56x56
-    256,    # 28x28
-    400,    # 14x14
-    400     # 7x7
-]
 
 hidden_dims160 = [
     32,     # 80x80
@@ -34,18 +26,23 @@ hidden_dims160 = [
 
 latent_dim = 512
 
-'''
-model = BetaVAE(input_channels=3, latent_dim=latent_dim, latent_size=5, hidden_dims=hidden_dims160)
-
-model.train(
-    dataIter,
-    Adam(model.parameters(), lr=1e-3, weight_decay=5e-4),
-    256,
-    lambda epoch, train_loss: logger.log("Epoch = %d, loss = %f" % (epoch, train_loss))
+model = AdversarialVAE(
+    BetaVAE(input_channels=3, latent_dim=latent_dim, latent_size=5, hidden_dims=hidden_dims160),
+    input_channels=3, latent_dim=latent_dim, latent_size=5, hidden_dims=hidden_dims160, alpha=0.9
 )
 '''
+model.train(
+    dataIter,
+    RMSprop(model.model.parameters(), lr=1e-3, weight_decay=5e-4),
+    RMSprop(model.discriminator.parameters(), lr=1e-3, weight_decay=5e-4),
+    1,
+    lambda epoch, train_loss, d_loss: logger.log("Epoch = %d, VAE_loss = %f, D_loss = %f" % (epoch, train_loss, d_loss))
+)'''
 
-model = torch.load("vae.pkl")
+# model = torch.load("vae.pkl")
+
+torch.save(model, "ad_vae.pkl")
+torch.save(model.state_dict(), "ad_vae_parameter.pkl")
 
 # Sample
 _, axes = plt.subplots(3, 3)
@@ -60,7 +57,7 @@ for i in range(3):
 plt.show()
 
 _, axes = plt.subplots(2)
-ind = 9 # random.randint(0, len(dataset) - 1)
+ind = random.randint(0, len(dataset) - 1)
 img = transforms.ToPILImage()((dataIter.dataset[ind][0] + 1.0) / 2.0)
 axes[0].imshow(img)
 gen_x = model.generate(dataIter.dataset[ind][0].view(1, 3, 160, 160).to(model.device)).cpu().view(3, 160, 160)
@@ -68,6 +65,3 @@ img = transforms.ToPILImage()((gen_x + 1.0) / 2.0)
 axes[1].imshow(img)
 plt.show()
 img.save("1.jpg", "JPEG")
-
-# torch.save(model, "vae.pkl")
-# torch.save(model.state_dict(), "vae_parameter.pkl")

@@ -2,3 +2,4 @@ test/data
 .idea
 test/*.pkl
 test/*.log
+test/*.jpg

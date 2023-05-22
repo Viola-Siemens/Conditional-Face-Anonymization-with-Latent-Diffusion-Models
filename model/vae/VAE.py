@@ -1,11 +1,11 @@
+import random
 from abc import ABC, abstractmethod
-from typing import List, Any, Tuple, Callable
+from typing import List, Any, Callable
 
 import torch
 from torch import nn, Tensor
 from torch.optim import Optimizer
 from torch.utils.data import DataLoader
-
 
 torch.set_default_tensor_type(torch.DoubleTensor)
 
@@ -35,11 +35,12 @@ class BaseVAE(nn.Module, ABC):
         pass
 
     @abstractmethod
-    def loss_function(self, *inputs: Any, **kwargs) -> Tuple[Tensor, Tensor, Tensor]:
+    def loss_function(self, *inputs: Any, **kwargs) -> List[Tensor]:
         pass
 
     @abstractmethod
-    def train(self, dataIter: DataLoader, optimizer: Optimizer, epoches: int, callback: Callable[[int, float], None]) -> None:
+    def train(self, dataIter: DataLoader, optimizer: Optimizer, epoches: int,
+              callback: Callable[[int, float], None]) -> None:
         pass
 
 
@@ -50,11 +51,27 @@ def reparameterize(mu: Tensor, logvar: Tensor) -> Tensor:
 
 
 class BetaVAE(BaseVAE):
+    num_iter: int
+    latent_dim: int
+    latent_size: int
+    last_dim: int
+    beta: int
+    gamma: float
+    loss_type: str
+    device: torch.device
+
+    encoder: nn.Module
+    fc_mu: nn.Module
+    fc_var: nn.Module
+    decoder_input: nn.Module
+    decoder: nn.Module
+    final_layer: nn.Module
+
     def __init__(self,
                  input_channels: int,
                  latent_dim: int,
                  latent_size: int,
-                 hidden_dims: List = None,
+                 hidden_dims: List[int] = None,
                  beta: int = 4,
                  gamma: float = 1000.,
                  max_capacity: int = 25,
@@ -84,9 +101,11 @@ class BetaVAE(BaseVAE):
         for h_dim in hidden_dims:
             modules.append(
                 nn.Sequential(
-                    nn.Conv2d(in_channels, out_channels=h_dim,
-                              kernel_size=3, stride=2, padding=1, device=device),
-                    #nn.BatchNorm2d(h_dim, device=device),
+                    nn.Conv2d(in_channels, out_channels=h_dim, kernel_size=3, stride=2, padding=1, device=device),
+                    # nn.BatchNorm2d(h_dim, device=device),
+                    nn.LeakyReLU(),
+                    nn.Conv2d(h_dim, out_channels=h_dim,
+                              kernel_size=3, stride=1, padding=1, device=device),
                     nn.LeakyReLU()
                 )
             )
@@ -106,14 +125,12 @@ class BetaVAE(BaseVAE):
         for i in range(len(hidden_dims) - 1):
             modules.append(
                 nn.Sequential(
-                    nn.ConvTranspose2d(hidden_dims[i],
-                                       hidden_dims[i + 1],
-                                       kernel_size=3,
-                                       stride=2,
-                                       padding=1,
-                                       output_padding=1,
-                                       device=device),
-                    #nn.BatchNorm2d(hidden_dims[i + 1], device=device),
+                    nn.ConvTranspose2d(hidden_dims[i], out_channels=hidden_dims[i + 1],
+                                       kernel_size=3, stride=2, padding=1, output_padding=1, device=device),
+                    # nn.BatchNorm2d(hidden_dims[i + 1], device=device),
+                    nn.LeakyReLU(),
+                    nn.Conv2d(hidden_dims[i + 1], out_channels=hidden_dims[i + 1],
+                              kernel_size=3, stride=1, padding=1, device=device),
                     nn.LeakyReLU()
                 )
             )
@@ -128,7 +145,7 @@ class BetaVAE(BaseVAE):
                                padding=1,
                                output_padding=1,
                                device=device),
-            #nn.BatchNorm2d(hidden_dims[-1], device=device),
+            # nn.BatchNorm2d(hidden_dims[-1], device=device),
             nn.LeakyReLU(),
             nn.Conv2d(hidden_dims[-1], out_channels=input_channels, kernel_size=3, padding=1, device=device),
             nn.Tanh()
@@ -155,7 +172,7 @@ class BetaVAE(BaseVAE):
         z = reparameterize(mu, log_var)
         return [self.decode(z), x0, mu, log_var]
 
-    def loss_function(self, *args, **kwargs) -> Tuple[Tensor, Tensor, Tensor]:
+    def loss_function(self, *args, **kwargs) -> List[Tensor]:
         self.num_iter += 1
         recons = args[0]
         x0 = args[1]
@@ -175,7 +192,7 @@ class BetaVAE(BaseVAE):
         else:
             raise ValueError('Undefined loss type.')
 
-        return loss, recons_loss, kld_loss
+        return [loss, recons_loss, kld_loss]
 
     def sample(self, num_samples: int, current_device: int, **kwargs) -> Tensor:
         z = torch.randn(num_samples,
@@ -189,7 +206,8 @@ class BetaVAE(BaseVAE):
     def generate(self, x: Tensor, **kwargs) -> Tensor:
         return self.forward(x)[0]
 
-    def train(self, dataIter: DataLoader, optimizer: Optimizer, epoches: int, callback: Callable[[int, float], None]) -> None:
+    def train(self, dataIter: DataLoader, optimizer: Optimizer, epoches: int,
+              callback: Callable[[int, float], None]) -> None:
         for epoch in range(epoches):
             train_loss = 0.0
             for data, label in dataIter:
@@ -203,3 +221,116 @@ class BetaVAE(BaseVAE):
                 train_loss += loss.cpu().item()
             train_loss /= len(dataIter.dataset)
             callback(epoch, train_loss)
+
+
+class AdversarialVAE(BaseVAE):
+    num_iter: int
+    model: BaseVAE
+    latent_dim: int
+    latent_size: int
+    alpha: float
+    max_norm: float
+    discriminator: nn.Module
+    device: torch.device
+
+    def __init__(self, model: BaseVAE, input_channels: int, latent_dim: int, latent_size: int,
+                 hidden_dims: List = None, alpha: float = 0.5, max_norm: float = 10, device: torch.device = "cuda") -> None:
+        super(AdversarialVAE, self).__init__()
+
+        self.num_iter = 0
+        self.model = model
+        self.latent_dim = latent_dim
+        self.latent_size = latent_size
+        self.alpha = alpha
+        self.max_norm = max_norm
+        self.device = device
+
+        modules = []
+        if hidden_dims is None:
+            hidden_dims = [32, 64, 128, 256, 512]
+
+        in_channels = input_channels
+        for h_dim in hidden_dims:
+            modules.append(
+                nn.Sequential(
+                    nn.Conv2d(in_channels, out_channels=h_dim, kernel_size=3, stride=2, padding=1, device=device),
+                    # nn.BatchNorm2d(h_dim, device=device),
+                    nn.LeakyReLU(),
+                    nn.Conv2d(h_dim, out_channels=h_dim,
+                              kernel_size=3, stride=1, padding=1, device=device),
+                    nn.LeakyReLU()
+                )
+            )
+            in_channels = h_dim
+
+        modules.append(nn.Sequential(
+            nn.Flatten(start_dim=1),
+            nn.Linear(hidden_dims[-1] * latent_size * latent_size, latent_dim, device=device),
+            nn.LeakyReLU(),
+            nn.Linear(latent_dim, 1, device=device)
+        ))
+
+        self.discriminator = nn.Sequential(*modules)
+
+    def encode(self, x0: Tensor) -> List[Tensor]:
+        return self.model.encode(x0)
+
+    def decode(self, t0: Tensor) -> Tensor:
+        return self.model.decode(t0)
+
+    def forward(self, x0: Tensor, **kwargs) -> list[Tensor]:
+        ret = self.model.forward(x0, **kwargs)
+        ret.append(self.discriminator.forward(x0))
+        ret.append(self.discriminator.forward(ret[0].detach()))
+        return ret
+
+    def loss_function(self, *args, **kwargs) -> List[Tensor]:
+        self.num_iter += 1
+        recons = args[0]
+        x0 = args[1]
+        mu = args[2]
+        log_var = args[3]
+        belief_r = args[4]
+        belief_f = args[5]
+
+        bs = kwargs['batch_size']
+
+        loss, recons_loss, kld_loss = self.model.loss_function(recons, x0, mu, log_var)
+        mask = torch.randint(0, 2, (bs,), device=self.device)
+        belief = belief_r * mask - belief_f * (1.0 - mask)
+
+        return [loss, recons_loss, kld_loss, belief.sum()]
+
+    def sample(self, num_samples: int, current_device: int, **kwargs) -> Tensor:
+        return self.model.sample(num_samples, current_device, **kwargs)
+
+    def generate(self, x: Tensor, **kwargs) -> Tensor:
+        return self.forward(x)[0]
+
+    def train(self, dataIter: DataLoader, optimizer_VAE: Optimizer, optimizer_D: Optimizer, epoches: int,
+              callback: Callable[[int, float, float], None]) -> None:
+        for epoch in range(epoches):
+            train_loss = 0.0
+            d_loss = 0.0
+            for data, label in dataIter:
+                data = data.to(self.device)
+                recons, x0, mu, log_var, belief_r, belief_f = self.forward(data)
+                loss, recons_loss, kld_loss, belief_loss = self.loss_function(
+                    recons, x0, mu, log_var, belief_r, belief_f, batch_size=data.shape[0]
+                )
+
+                optimizer_D.zero_grad()
+                belief_loss.backward()
+                nn.utils.clip_grad_norm_(parameters=self.discriminator.parameters(), max_norm=self.max_norm, norm_type=2)
+                optimizer_D.step()
+                d_loss += belief_loss.cpu().item()
+
+                vae_loss = self.alpha * loss + (1.0 - self.alpha) * (self.discriminator.forward(recons).sum())
+                optimizer_VAE.zero_grad()
+                vae_loss.backward()
+                nn.utils.clip_grad_norm_(parameters=self.model.parameters(), max_norm=self.max_norm, norm_type=2)
+                optimizer_VAE.step()
+                train_loss += loss.cpu().item()
+            train_loss /= len(dataIter.dataset)
+            d_loss /= len(dataIter.dataset)
+            callback(epoch, train_loss, d_loss)
